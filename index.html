@@ -18,7 +18,7 @@
 
     button {
       padding: 15px;
-      margin: 10px 0;
+      margin: 8px 0;
       width: 100%;
       font-size: 16px;
       border-radius: 12px;
@@ -27,9 +27,14 @@
 
     canvas {
       max-width: 100%;
-      margin-top: 15px;
+      margin-top: 10px;
       border-radius: 10px;
       background: #fff;
+    }
+
+    .count {
+      margin-top: 10px;
+      opacity: 0.8;
     }
   </style>
 </head>
@@ -40,17 +45,21 @@
 
 <input type="file" accept="image/*" capture="environment" id="upload">
 
-<button onclick="scan()">Scan Dokumen</button>
+<button onclick="scan()">➕ Scan Halaman</button>
 
 <canvas id="canvas"></canvas>
 
-<button onclick="downloadPDF()">⬇️ Download PDF</button>
+<div class="count" id="count">0 halaman tersimpan</div>
+
+<button onclick="downloadPDF()">📘 Gabungkan & Download PDF</button>
 
 <script>
 let canvas = document.getElementById("canvas");
 let ctx = canvas.getContext("2d");
 
-async function scan() {
+let pages = [];
+
+function scan() {
   const file = document.getElementById("upload").files[0];
   if (!file) {
     alert("Ambil foto dokumen dulu");
@@ -76,34 +85,41 @@ async function scan() {
     }
 
     ctx.putImageData(imageData, 0, 0);
+
+    pages.push(canvas.toDataURL("image/jpeg", 1.0));
+    document.getElementById("count").innerText =
+      pages.length + " halaman tersimpan";
   };
 
   reader.readAsDataURL(file);
 }
 
 async function downloadPDF() {
-  const { PDFDocument } = PDFLib;
+  if (pages.length === 0) {
+    alert("Belum ada halaman yang discan");
+    return;
+  }
 
+  const { PDFDocument } = PDFLib;
   const pdfDoc = await PDFDocument.create();
 
-  const imageBytes = canvas.toDataURL("image/jpeg", 1.0);
-  const jpgImage = await pdfDoc.embedJpg(imageBytes);
-
-  const page = pdfDoc.addPage([jpgImage.width, jpgImage.height]);
-  page.drawImage(jpgImage, {
-    x: 0,
-    y: 0,
-    width: jpgImage.width,
-    height: jpgImage.height,
-  });
+  for (let imgData of pages) {
+    const jpg = await pdfDoc.embedJpg(imgData);
+    const page = pdfDoc.addPage([jpg.width, jpg.height]);
+    page.drawImage(jpg, {
+      x: 0,
+      y: 0,
+      width: jpg.width,
+      height: jpg.height
+    });
+  }
 
   const pdfBytes = await pdfDoc.save();
-
   const blob = new Blob([pdfBytes], { type: "application/pdf" });
-  const link = document.createElement("a");
 
+  const link = document.createElement("a");
   link.href = URL.createObjectURL(blob);
-  link.download = "scan-dokumen.pdf";
+  link.download = "scan-multi-halaman.pdf";
   link.click();
 }
 </script>
