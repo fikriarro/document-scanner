@@ -41,7 +41,7 @@
 
 <body>
 
-<h2>📄 Personal Document Scanner</h2>
+<h2>📄 Personal Document Scanner (A4 Optimized)</h2>
 
 <input type="file" accept="image/*" capture="environment" id="upload">
 
@@ -51,13 +51,17 @@
 
 <div class="count" id="count">0 halaman tersimpan</div>
 
-<button onclick="downloadPDF()">📘 Gabungkan & Download PDF</button>
+<button onclick="downloadPDF()">📘 Download PDF</button>
 
 <script>
 let canvas = document.getElementById("canvas");
 let ctx = canvas.getContext("2d");
 
 let pages = [];
+
+// ukuran A4 digital ±150 DPI
+const A4_WIDTH = 1240;
+const A4_HEIGHT = 1754;
 
 function scan() {
   const file = document.getElementById("upload").files[0];
@@ -72,13 +76,15 @@ function scan() {
   reader.onload = e => img.src = e.target.result;
 
   img.onload = () => {
-    canvas.width = img.width;
-    canvas.height = img.height;
-    ctx.drawImage(img, 0, 0);
+    canvas.width = A4_WIDTH;
+    canvas.height = A4_HEIGHT;
 
-    let imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0, A4_WIDTH, A4_HEIGHT);
+
+    let imageData = ctx.getImageData(0, 0, A4_WIDTH, A4_HEIGHT);
     let data = imageData.data;
 
+    // grayscale ringan
     for (let i = 0; i < data.length; i += 4) {
       let avg = (data[i] + data[i+1] + data[i+2]) / 3;
       data[i] = data[i+1] = data[i+2] = avg;
@@ -86,7 +92,9 @@ function scan() {
 
     ctx.putImageData(imageData, 0, 0);
 
-    pages.push(canvas.toDataURL("image/jpeg", 1.0));
+    // simpan dengan kompresi
+    pages.push(canvas.toDataURL("image/jpeg", 0.6));
+
     document.getElementById("count").innerText =
       pages.length + " halaman tersimpan";
   };
@@ -96,7 +104,7 @@ function scan() {
 
 async function downloadPDF() {
   if (pages.length === 0) {
-    alert("Belum ada halaman yang discan");
+    alert("Belum ada halaman");
     return;
   }
 
@@ -105,21 +113,22 @@ async function downloadPDF() {
 
   for (let imgData of pages) {
     const jpg = await pdfDoc.embedJpg(imgData);
-    const page = pdfDoc.addPage([jpg.width, jpg.height]);
+    const page = pdfDoc.addPage([A4_WIDTH, A4_HEIGHT]);
     page.drawImage(jpg, {
       x: 0,
       y: 0,
-      width: jpg.width,
-      height: jpg.height
+      width: A4_WIDTH,
+      height: A4_HEIGHT
     });
   }
 
   const pdfBytes = await pdfDoc.save();
-  const blob = new Blob([pdfBytes], { type: "application/pdf" });
 
+  const blob = new Blob([pdfBytes], { type: "application/pdf" });
   const link = document.createElement("a");
+
   link.href = URL.createObjectURL(blob);
-  link.download = "scan-multi-halaman.pdf";
+  link.download = "scan-a4.pdf";
   link.click();
 }
 </script>
