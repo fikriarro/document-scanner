@@ -3,7 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Personal Document Scanner</title>
+<title>Universal Document Scanner</title>
+
+<link href="https://unpkg.com/cropperjs/dist/cropper.min.css" rel="stylesheet"/>
 
 <style>
 body {
@@ -23,39 +25,22 @@ button {
   font-size:15px;
 }
 
-button.secondary {
-  background:#6b7280;
-}
+button.secondary { background:#6b7280; }
+button.green { background:#10b981; }
 
-input[type=text] {
-  padding:10px;
-  width:90%;
-  max-width:300px;
-  border-radius:6px;
-  border:1px solid #ccc;
-  margin-top:10px;
-}
-
-#preview {
+img {
   max-width:100%;
   margin-top:15px;
   border-radius:6px;
-  display:none;
 }
 
-.filter button {
-  background:#10b981;
-}
-
-canvas {
-  display:none;
-}
+canvas { display:none; }
 </style>
 </head>
 
 <body>
 
-<h2>📄 Personal Document Scanner</h2>
+<h2>📄 Universal Document Scanner</h2>
 
 <input type="file" accept="image/*" capture="environment" id="camera" hidden>
 <input type="file" accept="image/*" id="gallery" hidden>
@@ -65,9 +50,19 @@ canvas {
 
 <br>
 
-<img id="preview">
+<img id="image">
 
-<div class="filter" id="filters" style="display:none">
+<br>
+
+<div id="cropControls" style="display:none">
+  <button class="green" onclick="cropImage()">✂️ Potong Dokumen</button>
+</div>
+
+<div id="reCropControls" style="display:none">
+  <button class="secondary" onclick="reCrop()">🔁 Crop Ulang</button>
+</div>
+
+<div id="filterControls" style="display:none">
   <p>Pilih mode warna</p>
   <button onclick="applyFilter('normal')">Asli</button>
   <button onclick="applyFilter('clear')">Jernih</button>
@@ -77,13 +72,14 @@ canvas {
 
 <br>
 
-<button class="secondary" id="saveBtn" style="display:none" onclick="savePage()">
+<button id="saveBtn" class="secondary" style="display:none" onclick="savePage()">
 Simpan Halaman
 </button>
 
 <br>
 
-<input type="text" id="filename" placeholder="Nama dokumen (opsional)">
+<input type="text" id="filename" placeholder="Nama dokumen (opsional)"
+style="padding:10px;width:90%;max-width:300px;border-radius:6px;border:1px solid #ccc;">
 
 <br><br>
 
@@ -93,77 +89,122 @@ Simpan Halaman
 
 <canvas id="canvas"></canvas>
 
+<script src="https://unpkg.com/cropperjs/dist/cropper.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <script>
-const camera = document.getElementById("camera");
-const gallery = document.getElementById("gallery");
-const preview = document.getElementById("preview");
+let cropper;
+let pages = [];
+const image = document.getElementById("image");
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 
-let originalImage = new Image();
-let pages = [];
+camera.onchange = loadImage;
+gallery.onchange = loadImage;
 
-camera.onchange = handleFile;
-gallery.onchange = handleFile;
-
-function handleFile(e){
+function loadImage(e){
   const file = e.target.files[0];
   if(!file) return;
 
   const reader = new FileReader();
   reader.onload = ev => {
-    originalImage.src = ev.target.result;
-    preview.src = ev.target.result;
-    preview.style.display="block";
-    document.getElementById("filters").style.display="block";
-    document.getElementById("saveBtn").style.display="inline-block";
+    image.src = ev.target.result;
+
+    if(cropper) cropper.destroy();
+
+    cropper = new Cropper(image, {
+      viewMode: 1,
+      autoCropArea: 0.9,
+      responsive: true
+    });
+
+    document.getElementById("cropControls").style.display="block";
+    document.getElementById("filterControls").style.display="none";
+    document.getElementById("saveBtn").style.display="none";
+    document.getElementById("reCropControls").style.display="none";
   };
   reader.readAsDataURL(file);
 }
 
+function cropImage(){
+  const cropped = cropper.getCroppedCanvas({
+    imageSmoothingQuality: "high"
+  });
+
+  image.src = cropped.toDataURL("image/jpeg",0.9);
+
+  cropper.destroy();
+  cropper = null;
+
+  document.getElementById("cropControls").style.display="none";
+  document.getElementById("reCropControls").style.display="block";
+  document.getElementById("filterControls").style.display="block";
+  document.getElementById("saveBtn").style.display="inline-block";
+}
+
+function reCrop(){
+  const img = new Image();
+  img.onload = () => {
+    image.src = img.src;
+    cropper = new Cropper(image,{
+      viewMode:1,
+      autoCropArea:0.9
+    });
+
+    document.getElementById("cropControls").style.display="block";
+    document.getElementById("filterControls").style.display="none";
+    document.getElementById("saveBtn").style.display="none";
+    document.getElementById("reCropControls").style.display="none";
+  };
+  img.src = image.src;
+}
+
 function applyFilter(type){
-  canvas.width = 794;
-  canvas.height = 1123;
+  const img = new Image();
+  img.onload = () => {
+    canvas.width = img.width;
+    canvas.height = img.height;
+    ctx.drawImage(img,0,0);
 
-  ctx.drawImage(originalImage,0,0,canvas.width,canvas.height);
-  let img = ctx.getImageData(0,0,canvas.width,canvas.height);
-  let d = img.data;
+    let data = ctx.getImageData(0,0,canvas.width,canvas.height);
+    let d = data.data;
 
-  for(let i=0;i<d.length;i+=4){
-    let r=d[i], g=d[i+1], b=d[i+2];
+    for(let i=0;i<d.length;i+=4){
+      let r=d[i], g=d[i+1], b=d[i+2];
 
-    if(type==="bw"){
-      let avg=(r+g+b)/3;
-      d[i]=d[i+1]=d[i+2]=avg;
+      if(type==="bw"){
+        let avg=(r+g+b)/3;
+        d[i]=d[i+1]=d[i+2]=avg;
+      }
+
+      if(type==="bright"){
+        d[i]=Math.min(r+40,255);
+        d[i+1]=Math.min(g+40,255);
+        d[i+2]=Math.min(b+40,255);
+      }
+
+      if(type==="clear"){
+        d[i]=Math.min(r*1.2,255);
+        d[i+1]=Math.min(g*1.2,255);
+        d[i+2]=Math.min(b*1.2,255);
+      }
     }
 
-    if(type==="bright"){
-      d[i]=Math.min(r+40,255);
-      d[i+1]=Math.min(g+40,255);
-      d[i+2]=Math.min(b+40,255);
-    }
-
-    if(type==="clear"){
-      d[i]=Math.min(r*1.2,255);
-      d[i+1]=Math.min(g*1.2,255);
-      d[i+2]=Math.min(b*1.2,255);
-    }
-  }
-
-  ctx.putImageData(img,0,0);
-  preview.src = canvas.toDataURL("image/jpeg",0.7);
+    ctx.putImageData(data,0,0);
+    image.src = canvas.toDataURL("image/jpeg",0.8);
+  };
+  img.src = image.src;
 }
 
 function savePage(){
-  pages.push(preview.src);
+  pages.push(image.src);
   document.getElementById("count").innerText =
     pages.length + " halaman tersimpan";
 
-  preview.style.display="none";
-  document.getElementById("filters").style.display="none";
+  image.src = "";
+  document.getElementById("filterControls").style.display="none";
   document.getElementById("saveBtn").style.display="none";
+  document.getElementById("reCropControls").style.display="none";
 }
 
 function downloadPDF(){
@@ -173,17 +214,22 @@ function downloadPDF(){
   }
 
   let name = document.getElementById("filename").value.trim();
-
   if(name===""){
     const d = new Date();
-    name = `scan-${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}-${d.getHours()}-${d.getMinutes()}`;
+    name = `scan-${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}`;
   }
 
-  const pdf = new jspdf.jsPDF("p","pt","a4");
+  const pdf = new jspdf.jsPDF();
 
   pages.forEach((img,i)=>{
-    if(i>0) pdf.addPage();
-    pdf.addImage(img,"JPEG",0,0,595,842);
+    const imgObj = new Image();
+    imgObj.src = img;
+
+    const w = imgObj.width;
+    const h = imgObj.height;
+
+    if(i>0) pdf.addPage([w,h]);
+    pdf.addImage(img,"JPEG",0,0,w,h);
   });
 
   pdf.save(name + ".pdf");
