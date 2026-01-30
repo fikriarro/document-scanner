@@ -1,22 +1,20 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Personal Document Scanner</title>
-
-<link
-  href="https://unpkg.com/cropperjs/dist/cropper.css"
-  rel="stylesheet"
-/>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ROYYAN DOCUMENT SCANNER</title>
 
 <style>
 body {
   font-family: Arial, sans-serif;
+  background: #f4f6f8;
   padding: 15px;
-  background: #f6f6f6;
 }
-h2 { text-align:center; }
+
+h2 {
+  text-align: center;
+}
 
 button {
   width: 100%;
@@ -28,77 +26,54 @@ button {
 img {
   max-width: 100%;
   margin-top: 10px;
+  border-radius: 6px;
   display: none;
+}
+
+.section {
+  margin-top: 15px;
 }
 </style>
 </head>
 
 <body>
 
-<h2>Document Scanner</h2>
+<h2>ROYYAN DOCUMENT SCANNER</h2>
 
-<input type="file" accept="image/*" id="fileInput">
+<div class="section">
+  <input type="file" accept="image/*" capture="environment" id="cameraInput">
+  <input type="file" accept="image/*" id="galleryInput">
+</div>
 
-<img id="image">
+<img id="preview">
 
-<button id="cropBtn" style="display:none;">Potong Dokumen</button>
-<button id="recropBtn" style="display:none;">Crop Ulang</button>
+<div class="section">
+  <button id="cropBtn" disabled>✂️ Crop Dokumen</button>
+</div>
 
-<script src="https://unpkg.com/cropperjs/dist/cropper.js"></script>
+<div class="section">
+  <p><b>Hasil Crop:</b></p>
+  <img id="result">
+</div>
 
 <script>
-let cropper;
-const image = document.getElementById("image");
-const fileInput = document.getElementById("fileInput");
+const cameraInput = document.getElementById("cameraInput");
+const galleryInput = document.getElementById("galleryInput");
+const preview = document.getElementById("preview");
 const cropBtn = document.getElementById("cropBtn");
-const recropBtn = document.getElementById("recropBtn");
 
-fileInput.addEventListener("change", e => {
-  const file = e.target.files[0];
-  if (!file) return;
-
+function handleFile(file) {
   const reader = new FileReader();
   reader.onload = () => {
-    image.src = reader.result;
-    image.style.display = "block";
-
-    if (cropper) cropper.destroy();
-
-    cropper = new Cropper(image, {
-      viewMode: 1,
-      autoCropArea: 0.9,
-      movable: true,
-      zoomable: true,
-      scalable: true,
-      rotatable: false
-    });
-
-    cropBtn.style.display = "block";
-    recropBtn.style.display = "none";
+    preview.src = reader.result;
+    preview.style.display = "block";
+    cropBtn.disabled = false;
   };
   reader.readAsDataURL(file);
-});
+}
 
-cropBtn.onclick = () => {
-  const canvas = cropper.getCroppedCanvas();
-  image.src = canvas.toDataURL("image/jpeg", 0.9);
-
-  cropper.destroy();
-  cropper = null;
-
-  cropBtn.style.display = "none";
-  recropBtn.style.display = "block";
-};
-
-recropBtn.onclick = () => {
-  cropper = new Cropper(image, {
-    viewMode: 1,
-    autoCropArea: 0.9
-  });
-
-  cropBtn.style.display = "block";
-  recropBtn.style.display = "none";
-};
+cameraInput.onchange = e => handleFile(e.target.files[0]);
+galleryInput.onchange = e => handleFile(e.target.files[0]);
 </script>
 
 </body>
